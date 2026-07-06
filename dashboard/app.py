@@ -126,7 +126,7 @@ safe_image(banner_col, os.path.join(ASSETS_DIR, "banner.png"), fallback_emoji="ð
 with title_col:
     st.title("FarmGuard AI")
     st.markdown("**Live climate risk & market price monitoring for Kenyan farmers**")
-    st.caption(f"Connected to API: `{API_URL}`  |  {datetime.now().strftime('%A, %d %B %Y')}")
+    st.caption(f" {datetime.now().strftime('%A, %d %B %Y')}")
 
 st.divider()
 
