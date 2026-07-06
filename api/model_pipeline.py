@@ -67,23 +67,45 @@ def fetch_weather_data(lat=-1.2921, lon=36.8219, days=365):
 
 
 def _synthetic_weather(days, lat=-1.2921):
-    """Fallback used when Open-Meteo is unreachable. Rough latitude-aware
-    seasonality so arid-north counties don't get the same rainfall profile
-    as the lake basin."""
+    """Fallback used when Open-Meteo is unreachable.
+    Introduces regional baseline temperatures to prevent false universal heat stress."""
     dates = pd.date_range(end=datetime.now(), periods=days, freq="D")
     doy = np.array([d.timetuple().tm_yday for d in dates])
-    aridity = max(0.3, 1 - abs(lat) / 5)  # rough: further from equator band -> drier baseline in this toy model
+    
+    # 1. Establish localized baseline temperatures based on latitude bands
+    # Central highlands/High-altitude (e.g., Nyeri, Kiambu around lat -0.5 to -1.3)
+    if -1.5 <= lat <= -0.3:
+        base_temp = 18.0  # Cooler highlands baseline
+        temp_spread = 4.0
+    # Lake Basin / Coastal / Northern Arid zones
+    elif lat < -1.5 or lat > 1.0:
+        base_temp = 27.0  # Hotter lowlands baseline
+        temp_spread = 6.0
+    else:
+        base_temp = 23.0  # Default standard baseline
+        temp_spread = 5.0
+
+    aridity = max(0.3, 1 - abs(lat) / 5)
     rainfall = np.maximum(0, 3 * aridity + 10 * aridity * np.sin(2 * np.pi * doy / 365) + np.random.normal(0, 5, days))
-    temp_mean = 24 + 6 * np.sin(2 * np.pi * (doy - 80) / 365) + np.random.normal(0, 2, days)
+    
+    # 2. Generate smooth, location-aware temperature curves
+    temp_mean = base_temp + temp_spread * np.sin(2 * np.pi * (doy - 80) / 365) + np.random.normal(0, 1.5, days)
+    
+    # Max temp spikes normally, keeping cooler regions safely below the 30°C threshold
+    temp_max = temp_mean + np.random.uniform(3.0, 5.5, days)
+    temp_min = temp_mean - np.random.uniform(3.0, 5.5, days)
+    
     return pd.DataFrame({
-        "date": dates, "temp_mean": temp_mean, "temp_max": temp_mean + 5,
-        "temp_min": temp_mean - 5, "rainfall": rainfall,
+        "date": dates, 
+        "temp_mean": temp_mean, 
+        "temp_max": temp_max,
+        "temp_min": temp_min, 
+        "rainfall": rainfall,
         "soil_moisture": np.clip(np.random.uniform(15, 80, days) * aridity + 10, 5, 90),
         "humidity_estimate": np.random.uniform(40, 85, days),
         "evapotranspiration": np.random.uniform(2, 7, days),
         "windspeed": np.random.uniform(5, 20, days),
     })
-
 
 def fetch_ndvi(lat=-1.2921, lon=36.8219):
     dates = pd.date_range(end=datetime.now(), periods=52, freq="W")
@@ -129,11 +151,18 @@ def label_climate_risk(df):
 def train_risk_model(df):
     features = ["temp_mean", "rainfall", "soil_moisture", "humidity_estimate", "evapotranspiration"]
     X, y = df[features], df["risk"]
-    if y.nunique() < 2:
-        # degenerate case (e.g. one class only) - still fit, just skip stratify
+    
+    # Check if any class has fewer than 2 instances
+    class_counts = y.value_counts()
+    has_singleton_class = (class_counts < 2).any()
+
+    if y.nunique() < 2 or has_singleton_class:
+        # Fallback case: Skip stratification if a class has only 1 member
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     else:
+        # Standard case: Safe to use stratified splitting
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+        
     model = GradientBoostingClassifier(n_estimators=150, learning_rate=0.1, max_depth=5, random_state=42)
     model.fit(X_train, y_train)
     acc = accuracy_score(y_test, model.predict(X_test))
