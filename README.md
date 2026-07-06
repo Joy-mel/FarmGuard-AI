@@ -1,7 +1,7 @@
 # FarmGuard AI 🌾
 
 
-**Explore the Live Dashboard:** [Click here to view the active platform]
+**Explore the Live Dashboard:** Click here to view the active platform
 (<https://farmguard-ai-s42ckdxjbsmgk4o9nyyqz8.streamlit.app/)>
 
 # FarmGuard AI — Full Architecture 
