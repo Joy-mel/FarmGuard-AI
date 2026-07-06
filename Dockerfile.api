@@ -1,0 +1,23 @@
+# FarmGuard AI - API service container
+# Build from the project root: docker build -f Dockerfile.api -t farmguard-api .
+FROM python:3.12-slim
+
+WORKDIR /srv
+
+COPY api/requirements.txt api/requirements.txt
+RUN pip install --no-cache-dir -r api/requirements.txt
+
+# Preserve the api/ + whatsapp/ sibling layout the code's relative imports expect
+COPY api/ api/
+COPY whatsapp/ whatsapp/
+
+WORKDIR /srv/api
+RUN python model_pipeline.py || true
+
+RUN useradd --create-home appuser && chown -R appuser:appuser /srv
+USER appuser
+
+ENV PORT=8000
+EXPOSE 8000
+
+CMD exec uvicorn main:app --host 0.0.0.0 --port ${PORT}
