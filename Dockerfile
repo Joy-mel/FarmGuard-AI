@@ -16,8 +16,5 @@ COPY . .
 # Expose the port Uvicorn runs on
 EXPOSE 8000
 
-# Tell python to look inside the root directory for modules
-ENV PYTHONPATH=/app
-
-# Start Uvicorn pointing directly to your api folder setup
+ENV PYTHONPATH=/app:/app/api
 CMD ["python", "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
